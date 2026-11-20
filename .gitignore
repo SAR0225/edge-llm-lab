@@ -1,0 +1,18 @@
+# Local dependencies and model weights
+/.venv/
+/venv/
+/models/
+*.gguf
+__pycache__/
+*.py[cod]
+
+# Raw experiment outputs and local settings
+/evaluations/
+*.log
+*.jsonl
+/results.csv
+/stream_results.csv
+.env
+.env.*
+.DS_Store
+Thumbs.db
