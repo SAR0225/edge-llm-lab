@@ -73,6 +73,19 @@ class CalculatorValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "不唯一"):
             dispatch(energy_plan(), "设备2瓦，本次工作3分钟，上次工作5分钟")
 
+    def test_explicit_cross_device_parameters_are_rejected(self):
+        plan = energy_plan(evidence="3分钟")
+        plan["arguments"]["power"]["evidence"] = "2瓦"
+        question = "设备A消耗2瓦功率，设备B工作3分钟。求设备A消耗的能量。"
+        with self.assertRaisesRegex(ValueError, "不同明确对象"):
+            dispatch(plan, question)
+
+    def test_same_device_across_clauses_is_allowed(self):
+        plan = energy_plan(evidence="3分钟")
+        plan["arguments"]["power"]["evidence"] = "2瓦"
+        question = "设备A消耗2瓦功率，设备A工作3分钟。"
+        self.assertEqual(Decimal(dispatch(plan, question)["calculation"]["result"]["J"]), 360)
+
     def test_refusal_text_is_not_treated_as_verified(self):
         outcome = dispatch({"operation": "insufficient", "arguments": {}, "message": "缺少质量"}, "元件2瓦，求能量")
         self.assertEqual(outcome["status"], "not_calculated")
@@ -94,8 +107,8 @@ class CalculatorValidationTests(unittest.TestCase):
                 self.assertEqual(process_response(response, "问题")[1]["status"], "rejected")
 
     def test_known_semantic_gap_remains_visible(self):
-        # Source matching alone cannot distinguish a different device's runtime.
-        question = "设备A功率2瓦，设备B运行3分钟，设备A运行时间未知，求设备A能量"
+        # The lightweight guard recognizes named equipment types, not arbitrary aliases.
+        question = "甲消耗2瓦，乙运行3分钟，求甲消耗的能量"
         self.assertEqual(dispatch(energy_plan(), question)["status"], "calculated")
 
 

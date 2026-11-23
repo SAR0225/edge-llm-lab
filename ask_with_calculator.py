@@ -50,10 +50,50 @@ SOURCE_QUANTITY = re.compile(
     + "|".join(re.escape(unit) for unit in UNITS)
     + r")(?![A-Za-zΩ])"
 )
+SUBJECT = re.compile(
+    r"(?:设备|元件|电阻|电容|电源|负载|支路|电池|灯泡|电机|装置|电路)"
+    r"\s*(?:[A-Za-zＡ-Ｚａ-ｚ]|[0-9]+|[一二三四五六七八九十甲乙丙丁])?"
+)
 
 
 def source_quantities(question):
     return list(SOURCE_QUANTITY.finditer(question))
+
+
+def clause_for(question, match):
+    """Get punctuation-bounded clause containing an exact numeric/unit citation."""
+    separators = "，,；;。！？!?\n"
+    start = max((question.rfind(mark, 0, match.start()) for mark in separators), default=-1) + 1
+    ends = [question.find(mark, match.end()) for mark in separators]
+    ends = [position for position in ends if position >= 0]
+    end = min(ends) if ends else len(question)
+    return question[start:end], start
+
+
+def explicit_subject(clause):
+    matches = list(SUBJECT.finditer(clause))
+    if not matches:
+        return None
+    # Only use a single explicit object label; ambiguous clauses are rejected upstream.
+    labels = {match.group(0).replace(" ", "") for match in matches}
+    if len(labels) != 1:
+        raise ValueError("同一句中存在多个明确对象，无法确定参数归属")
+    return next(iter(labels))
+
+
+def require_same_subject(question, *evidence_items):
+    subjects = []
+    for item in evidence_items:
+        evidence = item["evidence"]
+        matches = [match for match in source_quantities(question) if match.group(0) == evidence]
+        if not matches:
+            raise ValueError("参数引用必须是原文中完整的数值和单位")
+        clause, _ = clause_for(question, matches[0])
+        subject = explicit_subject(clause)
+        if subject is not None:
+            subjects.append(subject)
+    if len(subjects) >= 2 and len(set(subjects)) > 1:
+        raise ValueError("参数分别出现在不同明确对象的分句中，拒绝跨对象配对")
 
 
 def quantity_schema(units):
@@ -115,10 +155,12 @@ def dispatch(plan, question):
         return {"status": "not_calculated", "model_assessment": action,
                 "message": "模型未提出可执行的计算方案，请核对条件和支持范围。该判断未获独立验证。"}
     if action == "current" and set(args) == {"voltage", "resistance"}:
+        require_same_subject(question, args["voltage"], args["resistance"])
         voltage, _ = checked_quantity(args["voltage"], question, ("V",))
         resistance, unit = checked_quantity(args["resistance"], question, ("ohm", "kohm", "Mohm"))
         return {"status": "calculated", "calculation": calculate_current(voltage, resistance, unit)}
     if action == "energy" and set(args) == {"power", "duration"}:
+        require_same_subject(question, args["power"], args["duration"])
         power, _ = checked_quantity(args["power"], question, ("W",))
         duration, unit = checked_quantity(args["duration"], question, ("s", "min", "h"))
         return {"status": "calculated", "calculation": calculate_energy(power, duration, unit)}
