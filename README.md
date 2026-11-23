@@ -110,3 +110,7 @@ batch_eval.py读取eval_questions.json，按固定生成配置测试三道开发
 | `实验记录_量化对比.md` | 完整实验数据、判断和限制 |
 | `generate_figures.py` | 用摘要数据重新生成 README 图 |
 | `docs/figures/performance_summary.svg` | GitHub README 展示图 |
+
+## 许可证
+
+本项目代码及配套文档采用 [MIT License](LICENSE)。Qwen 模型权重、llama.cpp 及其他外部依赖由各自的许可证约束；本仓库的 MIT 许可证不替代这些第三方许可证。模型权重不随仓库分发。
