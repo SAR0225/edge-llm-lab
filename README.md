@@ -64,6 +64,20 @@ batch_eval.py读取eval_questions.json，按固定生成配置测试三道开发
 
 完整请求和响应保存在evaluations/run_*.jsonl；通过与否由预设标准语义复核，不是关键词自动判分。ask*.py和client*.py为逐步学习时的示例，使用前检查其中URL和模型别名是否对应当前服务。
 
+### 扩展到30题
+
+新增 `eval_questions_v2.json`，六类各五题，覆盖单位、功率、网络、电容/节点、信息不足和错误前提。参考答案不发送给模型；系统提示词保持不变，生成上限统一512 token。脚本会保存题库SHA-256和服务配置。具体评分方案与限制见[质量评测方案](docs/quality_evaluation.md)。
+
+```powershell
+.\.venv\Scripts\python.exe batch_eval.py qwen-local-q8 --questions eval_questions_v2.json --max-tokens 512
+```
+
+可用 `--base-url http://实际服务地址:8080` 指定局域网服务，用 `--dry-run` 只验证题库。本轮经Codex逐题语义复核，**Q8为18/30、Q4为11/30**；含过程实质错误或前后矛盾的回答不通过。Q4有1题重复输出并达到长度上限。两版每题各一次，不代表总体正确率；完整条件、类别得分、逐题差异和限制见[30题对照报告](docs/results/quality_v2_comparison.md)。
+
+另做了[提示词对照实验](docs/prompt_experiment.md)：Q4加入单位与独立核验提醒后，旧30题11→14分，但12道新题仍为5/12，并出现一次输出截断。默认提示词保留baseline，避免把开发题改善误认为总体提升。`--prompt-version checked`可复现试验版本；每轮保存提示词SHA-256及实际messages。
+
+新增[计算模块与模型提取客户端](docs/calculator.md)：模型提供结构化参数，Python核对原文数值、单位及唯一性后计算电流或电能。13项离线校验通过；仍有“把不同设备的时间与功率错配”的已知语义盲点。Schema约束格式，不保证理解正确；当前仅验证少量开发例子，没有重新测定整体问答评分。
+
 ## 已观察到的结果
 
 - 同源新Q4相比新Q8，文件体积减少约41.7%；固定tg128基准生成吞吐量提高约23.2%，不能直接当作聊天加速比。
